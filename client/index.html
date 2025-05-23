@@ -55,7 +55,7 @@
       document.getElementById("roomIdDisplay").innerText =
         localStorage.getItem("roomId") || "Public Room";
 
-      const socket = io("http://localhost:5000", {
+      const socket = io("https://realtime-chatroom-kqr6.onrender.com", {
         auth: { token },
       });
 
