@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Select or Create Room</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="auth-room.css" />
+</head>
+<body>
+  <div class="mode-toggle">
+    <label class="switch">
+      <input type="checkbox" id="modeSwitch" />
+      <span class="slider"></span>
+    </label>
+    <span>Dark Mode</span>
+  </div>
+
+  <div class="room-wrapper">
+    <div class="form-container">
+      <h2>🏠 Join a Chat Room</h2>
+
+      <div class="section">
+        <h3>Public Room</h3>
+        <select id="publicRoomSelect">
+          <option value="study">📘 Study</option>
+          <option value="chill">🎧 Chill</option>
+          <option value="games">🎮 Games</option>
+        </select>
+        <button class="full-btn" onclick="joinPublicRoom()">Join</button>
+      </div>
+
+      <div class="section">
+        <h3>Create Private Room</h3>
+        <input type="text" id="newRoomName" placeholder="Room Name" />
+        <input type="password" id="newRoomPassword" placeholder="4-digit Password" maxlength="4" />
+        <button class="full-btn" onclick="createPrivateRoom()">Create</button>
+        <div id="createdRoomInfo"></div>
+      </div>
+
+      <div class="section">
+        <h3>Join Private Room</h3>
+        <input type="text" id="roomId" placeholder="Room ID" />
+        <input type="password" id="roomPassword" placeholder="4-digit Password" maxlength="4" />
+        <button class="full-btn" onclick="joinPrivateRoom()">Join</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const token = localStorage.getItem("token");
+    const username = localStorage.getItem("username");
+    const mode = localStorage.getItem("mode");
+
+    if (!token || !username) {
+      alert("You must be logged in.");
+      window.location.href = "auth.html";
+    }
+
+    if (mode === "dark") {
+      document.body.classList.add("dark-mode");
+    } else {
+      document.body.classList.add("light-mode");
+    }
+
+    const modeSwitch = document.getElementById("modeSwitch");
+    modeSwitch.checked = mode === "dark";
+    modeSwitch.addEventListener("change", () => {
+      document.body.classList.toggle("dark-mode");
+      document.body.classList.toggle("light-mode");
+      localStorage.setItem("mode", modeSwitch.checked ? "dark" : "light");
+    });
+
+    const apiBase = "http://localhost:5000/api/rooms";
+
+    function joinPublicRoom() {
+      const room = document.getElementById("publicRoomSelect").value;
+      localStorage.setItem("roomName", room);
+      localStorage.setItem("roomType", "public");
+      window.location.href = "index.html";
+    }
+
+    async function createPrivateRoom() {
+      const name = document.getElementById("newRoomName").value;
+      const password = document.getElementById("newRoomPassword").value;
+
+      if (!name || password.length !== 4) return alert("Enter a valid name and 4-digit password.");
+
+      const res = await fetch(`${apiBase}/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, password, createdBy: username })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        document.getElementById("createdRoomInfo").innerText =
+          `Room "${data.name}" created! ID: ${data.roomId}`;
+        localStorage.setItem("roomName", data.name);
+        localStorage.setItem("roomId", data.roomId);
+        localStorage.setItem("roomType", "private");
+        window.location.href = "index.html";
+      } else {
+        alert(data.message || "Room creation failed.");
+      }
+    }
+
+    async function joinPrivateRoom() {
+      const id = document.getElementById("roomId").value;
+      const pass = document.getElementById("roomPassword").value;
+
+      if (!id || pass.length !== 4) return alert("Enter Room ID and 4-digit password.");
+
+      const res = await fetch(`${apiBase}/join`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomId: id, password: pass })
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        localStorage.setItem("roomName", data.name);
+        localStorage.setItem("roomId", data.roomId);
+        localStorage.setItem("roomType", "private");
+        window.location.href = "index.html";
+      } else {
+        alert(data.message || "Join failed.");
+      }
+    }
+  </script>
+</body>
+</html>

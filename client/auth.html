@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Login / Signup</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="auth-room.css" />
+</head>
+<body class="light-mode">
+  <div class="mode-toggle">
+    <label class="switch">
+      <input type="checkbox" id="modeSwitch" />
+      <span class="slider"></span>
+    </label>
+    <span>Dark Mode</span>
+  </div>
+
+  <div class="form-wrapper">
+    <div class="form-container">
+      <h2 id="formTitle">🔐 Login to Chatroom</h2>
+
+      <!-- Username only for signup -->
+      <input type="text" id="username" placeholder="Username" class="form-input hidden" />
+
+      <input type="email" id="email" placeholder="Email" class="form-input" />
+      <input type="password" id="password" placeholder="Password" class="form-input" />
+
+      <button id="submitBtn" onclick="login()">Login</button>
+
+      <p class="toggle-text">
+        Don't have an account? <a href="#" onclick="toggleMode(true)">Create one</a>
+      </p>
+    </div>
+  </div>
+
+  <script>
+    const baseURL = "http://localhost:5000/api/auth";
+
+    let isSignup = false;
+
+    function toggleMode(signup) {
+      isSignup = signup;
+
+      const title = document.getElementById("formTitle");
+      const usernameField = document.getElementById("username");
+      const submitBtn = document.getElementById("submitBtn");
+      const toggleText = document.querySelector(".toggle-text");
+
+      if (isSignup) {
+        title.innerText = "📝 Create a New Account";
+        usernameField.classList.remove("hidden");
+        submitBtn.innerText = "Sign Up";
+        submitBtn.setAttribute("onclick", "signup()");
+        toggleText.innerHTML = 'Already have an account? <a href="#" onclick="toggleMode(false)">Login</a>';
+      } else {
+        title.innerText = "🔐 Login to Chatroom";
+        usernameField.classList.add("hidden");
+        submitBtn.innerText = "Login";
+        submitBtn.setAttribute("onclick", "login()");
+        toggleText.innerHTML = 'Don\'t have an account? <a href="#" onclick="toggleMode(true)">Create one</a>';
+      }
+    }
+
+    async function signup() {
+      const username = document.getElementById("username").value;
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      const res = await fetch(`${baseURL}/signup`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, email, password }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("username", username);
+        window.location.href = "room.html";
+      } else {
+        alert(data.message || "Signup failed.");
+      }
+    }
+
+    async function login() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      const res = await fetch(`${baseURL}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("username", data.username);
+        window.location.href = "room.html";
+      } else {
+        alert(data.message || "Login failed.");
+      }
+    }
+
+    // Dark mode toggle
+    const modeSwitch = document.getElementById("modeSwitch");
+    modeSwitch.addEventListener("change", () => {
+      document.body.classList.toggle("dark-mode");
+      document.body.classList.toggle("light-mode");
+    });
+  </script>
+</body>
+</html>
