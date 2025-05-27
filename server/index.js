@@ -12,6 +12,7 @@ const jwt = require('jsonwebtoken');
 const authRoutes = require('./auth/authRoutes');
 const roomRoutes = require('./rooms/roomRoutes');
 
+
 const app = express();
 const server = http.createServer(app);
 
