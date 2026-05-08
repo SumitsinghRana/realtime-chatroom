@@ -12,7 +12,6 @@ const jwt = require('jsonwebtoken');
 const authRoutes = require('./auth/authRoutes');
 const roomRoutes = require('./rooms/roomRoutes');
 
-
 const app = express();
 const server = http.createServer(app);
 
@@ -27,11 +26,14 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/rooms', roomRoutes);
 
+// Home Route
+app.get("/", (req, res) => {
+  res.send("Realtime Chatroom Backend is Running 🚀");
+});
+
 // MongoDB Connection
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true
-}).then(() => console.log('MongoDB connected'))
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log('MongoDB connected'))
   .catch(err => console.error('MongoDB connection error:', err));
 
 // Socket.io setup
@@ -45,7 +47,10 @@ const io = new Server(server, {
 // Socket.io JWT authentication middleware
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
-  if (!token) return next(new Error("Authentication error"));
+
+  if (!token) {
+    return next(new Error("Authentication error"));
+  }
 
   try {
     const user = jwt.verify(token, process.env.JWT_SECRET);
@@ -60,64 +65,72 @@ io.use((socket, next) => {
 io.on('connection', (socket) => {
   console.log(`✅ User connected: ${socket.id}`);
 
-socket.on("join_room", async (room) => {
-  socket.join(room);
-  socket.currentRoom = room;
+  socket.on("join_room", async (room) => {
+    socket.join(room);
+    socket.currentRoom = room;
 
-  if (!activeRoomUsers[room]) activeRoomUsers[room] = new Set();
-  activeRoomUsers[room].add(socket.id);
+    if (!activeRoomUsers[room]) {
+      activeRoomUsers[room] = new Set();
+    }
 
-  console.log(`➡️ User ${socket.id} joined room: ${room}`);
+    activeRoomUsers[room].add(socket.id);
 
-  // Send chat history
-  const recentMessages = await Message.find({ room }).sort({ timestamp: 1 }).limit(50);
-  socket.emit("chat_history", recentMessages);
+    console.log(`➡️ User ${socket.id} joined room: ${room}`);
 
-  // Notify others
-  socket.to(room).emit("receive_message", {
-    sender: "System",
-    message: `${socket.user.username} has joined the room.`,
-    timestamp: new Date().toISOString()
+    // Send chat history
+    const recentMessages = await Message.find({ room })
+      .sort({ timestamp: 1 })
+      .limit(50);
+
+    socket.emit("chat_history", recentMessages);
+
+    // Notify others
+    socket.to(room).emit("receive_message", {
+      sender: "System",
+      message: `${socket.user.username} has joined the room.`,
+      timestamp: new Date().toISOString()
+    });
   });
 
+  // Typing indicator
   socket.on("typing", () => {
-  const room = socket.currentRoom;
-  if (room && socket.user?.username) {
-    // Notify others in the room (excluding sender)
-    socket.to(room).emit("show_typing", socket.user.username);
-  }
-});
+    const room = socket.currentRoom;
 
-socket.on("stop_typing", () => {
-  const room = socket.currentRoom;
-  if (room) {
-    socket.to(room).emit("hide_typing");
-  }
-});
+    if (room && socket.user?.username) {
+      socket.to(room).emit("show_typing", socket.user.username);
+    }
+  });
 
-});
+  socket.on("stop_typing", () => {
+    const room = socket.currentRoom;
 
-socket.on("send_message", async (data) => {
-  const room = data.room || socket.currentRoom;
+    if (room) {
+      socket.to(room).emit("hide_typing");
+    }
+  });
 
-  if (room) {
-    const newMsg = new Message({
-      room,
-      sender: data.sender,
-      message: data.message
-    });
-    await newMsg.save();
+  // Send message
+  socket.on("send_message", async (data) => {
+    const room = data.room || socket.currentRoom;
 
-    io.to(room).emit("receive_message", {
-      sender: data.sender,
-      message: data.message,
-      timestamp: newMsg.timestamp
-    });
-  }
-});
+    if (room) {
+      const newMsg = new Message({
+        room,
+        sender: data.sender,
+        message: data.message
+      });
 
+      await newMsg.save();
 
+      io.to(room).emit("receive_message", {
+        sender: data.sender,
+        message: data.message,
+        timestamp: newMsg.timestamp
+      });
+    }
+  });
 
+  // Disconnect
   socket.on("disconnect", async () => {
     const room = socket.currentRoom;
 
@@ -130,8 +143,10 @@ socket.on("send_message", async (data) => {
 
         // Check if the room is a private room in DB
         const dbRoom = await Room.findOne({ name: room });
+
         if (dbRoom && dbRoom.isPrivate) {
           await Room.deleteOne({ name: room });
+
           console.log(`🗑️ Private room "${room}" deleted because it became empty.`);
         }
       }
@@ -139,11 +154,11 @@ socket.on("send_message", async (data) => {
 
     console.log(`❌ User disconnected: ${socket.id}`);
   });
-
 });
 
 // Start server
 const PORT = process.env.PORT || 5000;
+
 server.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
